@@ -90,7 +90,7 @@ def get_county_choice():
         if county_input not in counties and input("Invalid input. Try again? (y/n)") != 'y':
             break
 
-        return county_input.strip()
+    return county_input.strip()
 
 
 def print_list_of_townlands_by_county(county):
