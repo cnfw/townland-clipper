@@ -1,16 +1,28 @@
 import sys
-import json
 import ijson
+import simplejson as json
 from pathlib import Path
 
-counties = ['antrim', 'armagh', 'carlow', 'cavan', 'clare', 'cork', 'derry', 'donegal', 'down', 'dublin', 'fermanagh',
-            'galway', 'kerry', 'kildare', 'kilkenny', 'laois', 'leitrim', 'limerick', 'longford', 'louth', 'mayo',
-            'meath', 'monaghan', 'offaly', 'roscommon', 'sligo', 'tipperary', 'tyrone', 'waterford', 'westmeath',
-            'wexford', 'wicklow']
+counties = ['carlow', 'cavan', 'clare', 'cork', 'donegal', 'dublin', 'galway', 'kerry', 'kildare', 'kilkenny', 'laois',
+            'leitrim', 'limerick', 'longford', 'louth', 'mayo', 'meath', 'monaghan', 'offaly', 'roscommon', 'sligo',
+            'tipperary', 'waterford', 'westmeath', 'wexford', 'wicklow']
 
 json_file_path = ''
 json_file = None
 json_data = None
+total_number_of_townlands = 61098  # From Wikipedia
+
+
+def write_progress(count, total=total_number_of_townlands, text=''):
+    bar_len = 50  # one notch for every 2%
+    filled_length = int(round(bar_len * count / float(total)))
+
+    percent_complete = round(100.0 * count / float(total), 1)
+    bar_text = '=' * filled_length + '-' * (bar_len - filled_length)
+
+    # Clear previous line
+    sys.stdout.write('[%s] %s%s %s\r' % (bar_text, percent_complete, '%', text))
+    sys.stdout.flush()
 
 
 def get_menu_choice():
@@ -19,7 +31,8 @@ def get_menu_choice():
     print("1. View list of townlands by county")
     print("2. Extract townlands by county")
     print("3. Convert geoJSON to GPX")
-    print("4. Exit")
+    print("4. Extract all counties' townlands into separate files")
+    print("5. Exit")
 
     return input("> ")
 
@@ -29,7 +42,8 @@ def get_process_name(menu_choice):
         '1': 'list-townlands-in-county',
         '2': 'extract-townlands-in-county',
         '3': 'not-ready',
-        '4': 'exit',
+        '4': 'extract-townlands-in-all-counties',
+        '5': 'exit',
     }.get(menu_choice, None)
 
 
@@ -100,8 +114,12 @@ def print_list_of_townlands_by_county(county):
     print("Reading file. This may take a long time. Please be patient!")
     county_upper = county.upper()
     townlands = []
-    load_json_file(json_file_path)
-    for townland in json_data:
+    json_file_iterator = load_json_file(json_file_path)
+
+    index = 0
+    for townland in json_file_iterator:
+        write_progress(index, text=county_upper)
+        index += 1
         if townland['properties']['COUNTY'] == county_upper:
             townlands.append(str(townland['properties']['TD_ENGLISH']).capitalize())
 
@@ -111,15 +129,25 @@ def print_list_of_townlands_by_county(county):
         print(townland)
 
 
-def extract_townlands_by_county(county):
+def extract_townlands_by_county(county, index=0, total=total_number_of_townlands):
     # To save changing to upper case in each for loop iteration
     county_upper = county.upper()
     print("Reading file. This may take a long time. Please be patient!")
 
+    # Make up a list of townlands in the given county
+    json_file_iterator = load_json_file(json_file_path)
+    townlands_dict_features = []
+
+    for townland in json_file_iterator:
+        write_progress(index, total=total, text=county_upper)
+        index += 1
+        if townland['properties']['COUNTY'] == county_upper:
+            townlands_dict_features.append(townland)
+
     # Put the new townland list into a new dictionary in the same format as original
     townlands_dict = {
         'type': 'FeatureCollection',
-        'features': [townland for townland in load_json_file(json_file_path) if townland['properties']['COUNTY'] == county_upper]
+        'features': townlands_dict_features
     }
 
     # Write the dictionary to a file in JSON representation
@@ -148,6 +176,16 @@ def main():
             county = get_county_choice()
             if county is not None:
                 extract_townlands_by_county(county)
+
+        elif process_name == 'extract-townlands-in-all-counties':
+            if input("This will take a very long time!\n(possibly hours on slower machines)\nAre you sure you want to do this? (y/n)") != 'y':
+                continue
+
+            index = 0
+            for county in counties:
+                index += 1
+                extract_townlands_by_county(county, index=index * total_number_of_townlands,
+                                            total=len(counties) * total_number_of_townlands)
 
         elif process_name == 'exit':
             start_exit_process()
