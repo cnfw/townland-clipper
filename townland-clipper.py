@@ -1,7 +1,7 @@
 import sys
-import os.path
 import json
-from pprint import pprint
+import ijson
+from pathlib import Path
 
 counties = ['antrim', 'armagh', 'carlow', 'cavan', 'clare', 'cork', 'derry', 'donegal', 'down', 'dublin', 'fermanagh',
             'galway', 'kerry', 'kildare', 'kilkenny', 'laois', 'leitrim', 'limerick', 'longford', 'louth', 'mayo',
@@ -9,6 +9,7 @@ counties = ['antrim', 'armagh', 'carlow', 'cavan', 'clare', 'cork', 'derry', 'do
             'wexford', 'wicklow']
 
 json_file_path = ''
+json_file = None
 json_data = None
 
 
@@ -26,7 +27,7 @@ def get_menu_choice():
 def get_process_name(menu_choice):
     return {
         '1': 'list-townlands-in-county',
-        '2': 'not-ready',
+        '2': 'extract-townlands-in-county',
         '3': 'not-ready',
         '4': 'exit',
     }.get(menu_choice, None)
@@ -36,12 +37,15 @@ def start_exit_process():
     if input("Are you sure? (y/n)\n> ") == 'y':
         print("Goodbye")
         global json_data
+        global json_file
         json_data = None
+        json_file.close()
         sys.exit(0)
 
 
 def load_json_file(file_path):
     try:
+        global json_file
         json_file = open(file_path, encoding='utf8')
     except FileNotFoundError:
         print("That file wasn't found... Please check your file path.")
@@ -55,25 +59,21 @@ def load_json_file(file_path):
     else:
         # Load file contents into a JSON object
         global json_data
-        json_data = json.load(json_file)
+        json_data = ijson.items(json_file, 'features.item')
 
-        json_file.close()
-        return True
+        return json_data
 
 
 def input_path_and_load_file():
     # Start a loop
     while True:
-        path_input = input("Enter a file path or 'exit' to leave.\n> ")
+        path_input = input("Enter a file path or 'exit' to leave.\n> ").strip('\"')
         if path_input.upper() == 'EXIT':
             start_exit_process()
-        if not load_json_file(path_input.strip('\"')):
-            if input("Try again? (y/n)\n> ") != 'y':
-                return
-            else:
-                continue
+        if not load_json_file(path_input):
+            continue
         else:
-            print("File loaded! Returning to the main menu.")
+            print("File loaded! Have fun.")
             global json_file_path
             json_file_path = path_input
             break
@@ -86,23 +86,48 @@ def get_county_choice():
 
     # Start a loop
     while True:
-        county_input = input("Enter a county name (case insensitive)\n> ")
-        if county_input not in counties and input("Invalid input. Try again? (y/n)") != 'y':
-            break
+        county_input = input("Enter a county name (case insensitive)\n> ").lower().strip()
+        if county_input not in counties:
+            if input("Invalid input. Try again? (y/n)") != 'y':
+                break
+        else:
+            return county_input
 
-    return county_input.strip()
+    return None
 
 
 def print_list_of_townlands_by_county(county):
-    print("Townlands in " + county.capitalize())
+    print("Reading file. This may take a long time. Please be patient!")
+    county_upper = county.upper()
     townlands = []
-    for townland in json_data['features']:
-        if townland['properties']['COUNTY'] == county.upper():
-            townlands.append(str(townland['properties']['TD_ENGLISH']).lower().capitalize())
+    load_json_file(json_file_path)
+    for townland in json_data:
+        if townland['properties']['COUNTY'] == county_upper:
+            townlands.append(str(townland['properties']['TD_ENGLISH']).capitalize())
 
     townlands.sort()
+    print("Townlands in " + county.capitalize())
     for townland in townlands:
         print(townland)
+
+
+def extract_townlands_by_county(county):
+    # To save changing to upper case in each for loop iteration
+    county_upper = county.upper()
+    print("Reading file. This may take a long time. Please be patient!")
+
+    # Put the new townland list into a new dictionary in the same format as original
+    townlands_dict = {
+        'type': 'FeatureCollection',
+        'features': [townland for townland in load_json_file(json_file_path) if townland['properties']['COUNTY'] == county_upper]
+    }
+
+    # Write the dictionary to a file in JSON representation
+    path = Path(json_file_path)
+    new_file_path = str(path.parent) + '/townlands_' + county + '.geojson'
+
+    with open(new_file_path, 'w') as o_file:
+        json.dump(townlands_dict, o_file)
 
 
 def main():
@@ -113,9 +138,17 @@ def main():
 
         if process_name == 'not-ready':
             print("This feature isn't ready yet, sorry!")
+
         elif process_name == 'list-townlands-in-county':
             county = get_county_choice()
-            print_list_of_townlands_by_county(county)
+            if county is not None:
+                print_list_of_townlands_by_county(county)
+
+        elif process_name == 'extract-townlands-in-county':
+            county = get_county_choice()
+            if county is not None:
+                extract_townlands_by_county(county)
+
         elif process_name == 'exit':
             start_exit_process()
 
