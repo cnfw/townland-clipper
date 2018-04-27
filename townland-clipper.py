@@ -129,6 +129,30 @@ def print_list_of_townlands_by_county(county):
         print(townland)
 
 
+def round_list(coord_list, round_to=4):
+    for i, coord in enumerate(coord_list):
+        if type(coord) is list:
+            round_list(coord, round_to=4)
+        else:
+            coord_list[i] = round(coord, round_to)
+
+
+def clean_townland_dict(townland_dict, keep_gaeilge=False):
+    # Remove unused properties
+    new_properties = {
+        'TD_ENGLISH': str(townland_dict['properties']['TD_ENGLISH'])
+    }
+    if keep_gaeilge:
+        new_properties['TD_GAEILGE'] = str(townland_dict['properties']['TD_GAEILGE'])
+
+    townland_dict['properties'] = new_properties
+
+    # Remove some coordinate precision
+    round_list(townland_dict['geometry']['coordinates'])
+
+    return townland_dict
+
+
 def extract_townlands_by_county(county, index=0, total=total_number_of_townlands):
     # To save changing to upper case in each for loop iteration
     county_upper = county.upper()
@@ -142,6 +166,7 @@ def extract_townlands_by_county(county, index=0, total=total_number_of_townlands
         write_progress(index, total=total, text=county_upper)
         index += 1
         if townland['properties']['COUNTY'] == county_upper:
+            clean_townland_dict(townland)
             townlands_dict_features.append(townland)
 
     # Put the new townland list into a new dictionary in the same format as original
