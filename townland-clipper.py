@@ -1,7 +1,8 @@
+import os
 import sys
+import argparse
 import ijson
 import simplejson as json
-from pathlib import Path
 
 counties = ['carlow', 'cavan', 'clare', 'cork', 'donegal', 'dublin', 'galway', 'kerry', 'kildare', 'kilkenny', 'laois',
             'leitrim', 'limerick', 'longford', 'louth', 'mayo', 'meath', 'monaghan', 'offaly', 'roscommon', 'sligo',
@@ -25,39 +26,9 @@ def write_progress(count, total=total_number_of_townlands, text=''):
     sys.stdout.flush()
 
 
-def get_menu_choice():
-    print("\n\nChoose an option from the menu")
-    print(41 * '=')
-    print("1. View list of townlands by county")
-    print("2. Extract townlands by county")
-    print("3. Convert geoJSON to GPX")
-    print("4. Extract all counties' townlands into separate files")
-    print("5. Exit")
-
-    return input("> ")
-
-
-def get_process_name(menu_choice):
-    return {
-        '1': 'list-townlands-in-county',
-        '2': 'extract-townlands-in-county',
-        '3': 'not-ready',
-        '4': 'extract-townlands-in-all-counties',
-        '5': 'exit',
-    }.get(menu_choice, None)
-
-
-def start_exit_process():
-    if input("Are you sure? (y/n)\n> ") == 'y':
-        print("Goodbye")
-        global json_data
-        global json_file
-        json_data = None
-        json_file.close()
-        sys.exit(0)
-
-
-def load_json_file(file_path):
+def load_json_file(file_path=None):
+    if file_path is None:
+        file_path = json_file_path
     try:
         global json_file
         json_file = open(file_path, encoding='utf8')
@@ -78,36 +49,12 @@ def load_json_file(file_path):
         return json_data
 
 
-def input_path_and_load_file():
-    # Start a loop
-    while True:
-        path_input = input("Enter a file path or 'exit' to leave.\n> ").strip('\"')
-        if path_input.upper() == 'EXIT':
-            start_exit_process()
-        if not load_json_file(path_input):
-            continue
-        else:
-            print("File loaded! Have fun.")
-            global json_file_path
-            json_file_path = path_input
-            break
+def list_counties():
+    print("List of counties:")
+    for x, y, z in zip(counties[::3][0], counties[1::3][0], counties[2::3][0]):
+        print('{:<15}{:<15}{:<}'.format(x.capitalize(), y.capitalize(), z.capitalize()))
 
-
-def get_county_choice():
-    print("List of counties:\n")
-    for county in counties:
-        print(county.capitalize())
-
-    # Start a loop
-    while True:
-        county_input = input("Enter a county name (case insensitive)\n> ").lower().strip()
-        if county_input not in counties:
-            if input("Invalid input. Try again? (y/n)") != 'y':
-                break
-        else:
-            return county_input
-
-    return None
+    print('Note that the counties in Northern Ireland are not included here.')
 
 
 def print_list_of_townlands_by_county(county):
@@ -153,10 +100,10 @@ def clean_townland_dict(townland_dict, keep_gaeilge=False):
     return townland_dict
 
 
-def extract_townlands_by_county(county, index=0, total=total_number_of_townlands):
+def extract_townlands_by_county(county, output_directory, index=0, total=total_number_of_townlands,
+                                reduce=False, gaeilge=False):
     # To save changing to upper case in each for loop iteration
     county_upper = county.upper()
-    print("Reading file. This may take a long time. Please be patient!")
 
     # Make up a list of townlands in the given county
     json_file_iterator = load_json_file(json_file_path)
@@ -166,7 +113,8 @@ def extract_townlands_by_county(county, index=0, total=total_number_of_townlands
         write_progress(index, total=total, text=county_upper)
         index += 1
         if townland['properties']['COUNTY'] == county_upper:
-            clean_townland_dict(townland)
+            if reduce:
+                clean_townland_dict(townland, gaeilge)
             townlands_dict_features.append(townland)
 
     # Put the new townland list into a new dictionary in the same format as original
@@ -176,44 +124,80 @@ def extract_townlands_by_county(county, index=0, total=total_number_of_townlands
     }
 
     # Write the dictionary to a file in JSON representation
-    path = Path(json_file_path)
-    new_file_path = str(path.parent) + '/townlands_' + county + '.geojson'
+    new_file_path = '{0}\\townlands_{1}{2}{3}.geojson'.format(output_directory, 'reduced_' if reduce else '',
+                                                              'with_gaeilge_' if gaeilge and reduce else '', county)
 
     with open(new_file_path, 'w') as o_file:
         json.dump(townlands_dict, o_file)
 
 
+def is_input_valid(parser, values):
+    # Validate arguments #
+    input_valid = True
+    # Make sure there is a path
+    if not values.path:
+        parser.error("Path not supplied")
+        input_valid = False
+
+    # Load up the file
+    global json_file_path
+    json_file_path = values.path
+    print(json_file_path)
+    if not load_json_file():
+        input_valid = False
+
+    # Check output directory is a directory
+    if not os.path.isdir(values.output_directory):
+        parser.error("Output supplied is not a directory.")
+        input_valid = False
+
+    # Make sure specific county wasn't specified with all
+    if values.all and values.county:
+        parser.error("--all and --county supplied. Only one should be supplied")
+        input_valid = False
+
+    # Make sure county specified is valid (if a county was specified)
+    if values.county and str(values.county).lower() not in counties:
+        parser.error('County specified was invalid. Check and try again (run --counties to see list of valid counties')
+        input_valid = False
+
+    return input_valid
+
+
 def main():
-    # Start a loop
-    while True:
-        menu_choice = get_menu_choice()
-        process_name = get_process_name(menu_choice)
+    parser = setup_parser()
+    values = parser.parse_args()
+    if values.info:
+        print_header()
+        sys.exit(0)
 
-        if process_name == 'not-ready':
-            print("This feature isn't ready yet, sorry!")
+    if values.counties:
+        list_counties()
+        sys.exit(0)
 
-        elif process_name == 'list-townlands-in-county':
-            county = get_county_choice()
-            if county is not None:
-                print_list_of_townlands_by_county(county)
+    # Throw in the towel if something went wrong
+    if not is_input_valid(parser, values):
+        sys.exit(1)
 
-        elif process_name == 'extract-townlands-in-county':
-            county = get_county_choice()
-            if county is not None:
-                extract_townlands_by_county(county)
+    # Warn user that this might take a while
+    print("Depending on the size of the input file, this could take a very long time. Please be patient!")
 
-        elif process_name == 'extract-townlands-in-all-counties':
-            if input("This will take a very long time!\n(possibly hours on slower machines)\nAre you sure you want to do this? (y/n)") != 'y':
-                continue
+    # Work out what to do
+    if values.county:
+        print("Extracting {0} townland information from {1}".format('reduced' if values.reduce else 'full',
+                                                                   str(values.county).capitalize()))
+        extract_townlands_by_county(values.county, values.output_directory, reduce=values.reduce,
+                                    gaeilge=values.gaeilge)
 
-            index = 0
-            for county in counties:
-                index += 1
-                extract_townlands_by_county(county, index=index * total_number_of_townlands,
-                                            total=len(counties) * total_number_of_townlands)
-
-        elif process_name == 'exit':
-            start_exit_process()
+    elif values.all:
+        print("Extracting {0} townland information for all counties.".format('reduced' if values.reduce else 'full'))
+        index = 0
+        for county in counties:
+            print("Now extracting " + county.upper())
+            index += 1
+            extract_townlands_by_county(county, values.output_directory, reduce=values.reduce, gaeilge=values.gaeilge,
+                                        index=index * total_number_of_townlands,
+                                        total=len(counties) * total_number_of_townlands)
 
 
 def print_header():
@@ -224,15 +208,42 @@ def print_header():
     print("more manageable files.")
     print(41 * '=')
     print("Title: Townland Clipper")
-    print("Version: 0.0")
+    print("Version: 0.1")
     print("Author: cw1998")
     print("Date: 24/04/18")
-    # TODO print("Usage: See -h or --help")
+    print("Updated: 27/04/2018")
+    print("Usage: See -h or --help")
     print("Python Version: 3")
     print(41 * '=')
 
 
+def setup_parser():
+    parser = argparse.ArgumentParser(
+        description='This script extracts information from the huge OSI townland datasets.')
+
+    parser.add_argument('path', nargs='?', help='Path to file')
+    parser.add_argument('-o', '--output', dest='output_directory', default=os.getcwd(),
+                        help='Place to put the processed file(s). Defaults to working directory.')
+    parser.add_argument('-c', '--county', type=str, help='Specify which county to extract from the file.')
+    parser.add_argument('-r', '--reduce', action='store_true', help='Reduce geometry precision to save file size.')
+    parser.add_argument('-a', '--all', action='store_true', help='Process all counties')
+    parser.add_argument('-g', '--gaeilge', '--irish', action='store_true',
+                        help='Keep Gaeilge townland spellings for Gaeltacht areas when --reduce is provided.')
+    parser.add_argument('--counties', action='store_true', help='Print a list of counties supported then exit.')
+    parser.add_argument('--info', action='store_true', help='Show some information about the programme.')
+
+    return parser
+
+
+def cleanup():
+    global json_data
+    global json_file
+    json_data = None
+    json_file.close()
+
+
 if __name__ == '__main__':
-    print_header()
-    input_path_and_load_file()
     main()
+    cleanup()
+
+    sys.exit(0)
