@@ -8,6 +8,8 @@ counties = ['carlow', 'cavan', 'clare', 'cork', 'donegal', 'dublin', 'galway', '
             'leitrim', 'limerick', 'longford', 'louth', 'mayo', 'meath', 'monaghan', 'offaly', 'roscommon', 'sligo',
             'tipperary', 'waterford', 'westmeath', 'wexford', 'wicklow']
 
+gaeltacht_counties = ['donegal', 'mayo', 'galway', 'kerry', 'cork', 'waterford', 'meath']
+
 json_file_path = ''
 json_file = None
 json_data = None
@@ -57,25 +59,6 @@ def list_counties():
     print('Note that the counties in Northern Ireland are not included here.')
 
 
-def print_list_of_townlands_by_county(county):
-    print("Reading file. This may take a long time. Please be patient!")
-    county_upper = county.upper()
-    townlands = []
-    json_file_iterator = load_json_file(json_file_path)
-
-    index = 0
-    for townland in json_file_iterator:
-        write_progress(index, text=county_upper)
-        index += 1
-        if townland['properties']['COUNTY'] == county_upper:
-            townlands.append(str(townland['properties']['TD_ENGLISH']).capitalize())
-
-    townlands.sort()
-    print("Townlands in " + county.capitalize())
-    for townland in townlands:
-        print(townland)
-
-
 def round_list(coord_list, round_to=4):
     for i, coord in enumerate(coord_list):
         if type(coord) is list:
@@ -89,7 +72,7 @@ def clean_townland_dict(townland_dict, keep_gaeilge=False):
     new_properties = {
         'TD_ENGLISH': str(townland_dict['properties']['TD_ENGLISH'])
     }
-    if keep_gaeilge:
+    if keep_gaeilge and str(townland_dict['properties']['COUNTY']).lower() in gaeltacht_counties:
         new_properties['TD_GAEILGE'] = str(townland_dict['properties']['TD_GAEILGE'])
 
     townland_dict['properties'] = new_properties
