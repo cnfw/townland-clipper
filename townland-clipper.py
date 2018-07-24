@@ -70,10 +70,10 @@ def round_list(coord_list, round_to=4):
 def clean_townland_dict(townland_dict, keep_gaeilge=False):
     # Remove unused properties
     new_properties = {
-        'TD_ENGLISH': str(townland_dict['properties']['TD_ENGLISH'])
+        'NAME_ENGLISH': str(townland_dict['properties']['TD_ENGLISH'])
     }
     if keep_gaeilge and str(townland_dict['properties']['COUNTY']).lower() in gaeltacht_counties:
-        new_properties['TD_GAEILGE'] = str(townland_dict['properties']['TD_GAEILGE'])
+        new_properties['NAME_GAEILGE'] = str(townland_dict['properties']['TD_GAEILGE'])
 
     townland_dict['properties'] = new_properties
 
