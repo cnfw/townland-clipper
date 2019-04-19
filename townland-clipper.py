@@ -107,7 +107,7 @@ def extract_townlands_by_county(county, output_directory, index=0, total=total_n
     }
 
     # Write the dictionary to a file in JSON representation
-    new_file_path = '{0}\\townlands_{1}{2}{3}.geojson'.format(output_directory, 'reduced_' if reduce else '',
+    new_file_path = '{0}/townlands_{1}{2}{3}.geojson'.format(output_directory, 'reduced_' if reduce else '',
                                                               'with_gaeilge_' if gaeilge and reduce else '', county)
 
     with open(new_file_path, 'w') as o_file:
