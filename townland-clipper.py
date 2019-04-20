@@ -3,6 +3,9 @@ import sys
 import argparse
 import ijson
 import simplejson as json
+from functools import partial
+
+from multiprocessing import Pool
 
 counties = ['carlow', 'cavan', 'clare', 'cork', 'donegal', 'dublin', 'galway', 'kerry', 'kildare', 'kilkenny', 'laois',
             'leitrim', 'limerick', 'longford', 'louth', 'mayo', 'meath', 'monaghan', 'offaly', 'roscommon', 'sligo',
@@ -82,6 +85,8 @@ def clean_townland_dict(townland_dict, keep_gaeilge=False):
 
     return townland_dict
 
+def test(townland):
+    return townland
 
 def extract_townlands_by_county(county, output_directory, index=0, total=total_number_of_townlands,
                                 reduce=False, gaeilge=False):
@@ -93,8 +98,8 @@ def extract_townlands_by_county(county, output_directory, index=0, total=total_n
     townlands_dict_features = []
 
     for townland in json_file_iterator:
-        write_progress(index, total=total, text=county_upper)
-        index += 1
+        # write_progress(index, total=total, text=county_upper)
+        # index += 1
         if townland['properties']['COUNTY'] == county_upper:
             if reduce:
                 clean_townland_dict(townland, gaeilge)
@@ -147,6 +152,16 @@ def is_input_valid(parser, values):
     return input_valid
 
 
+def extract_county_helper(county, values):
+    print(values)
+    print("Now extracting " + county.upper())
+    extract_townlands_by_county(county, values.output_directory, reduce=values.reduce, gaeilge=values.gaeilge,
+                                index=0,
+                                total=0)
+
+    return county
+
+
 def main():
     parser = setup_parser()
     values = parser.parse_args()
@@ -174,13 +189,16 @@ def main():
 
     elif values.all:
         print("Extracting {0} townland information for all counties.".format('reduced' if values.reduce else 'full'))
-        index = 0
-        for county in counties:
-            print("Now extracting " + county.upper())
-            index += 1
-            extract_townlands_by_county(county, values.output_directory, reduce=values.reduce, gaeilge=values.gaeilge,
-                                        index=index * total_number_of_townlands,
-                                        total=len(counties) * total_number_of_townlands)
+        # index = 0
+        # for county in counties:
+        #     print("Now extracting " + county.upper())
+        #     index += 1
+        #     extract_townlands_by_county(county, values.output_directory, reduce=values.reduce, gaeilge=values.gaeilge,
+        #                                 index=index * total_number_of_townlands,
+        #                                 total=len(counties) * total_number_of_townlands)
+
+        pool = Pool(processes=3)
+        print(pool.map(partial(extract_county_helper, values=values), counties))
 
 
 def print_header():
