@@ -1,9 +1,10 @@
 import os
 import sys
 import argparse
-import ijson
-import simplejson as json
+import json
 from functools import partial
+
+from pprint import pprint
 
 from multiprocessing import Pool, Manager
 
@@ -37,7 +38,8 @@ def load_json_file(file_path=None):
     else:
         # Load file contents into a JSON object
         global json_data
-        json_data = ijson.items(json_file, 'features.item')
+
+        json_data = json.load(json_file)['features']
 
         return json_data
 
