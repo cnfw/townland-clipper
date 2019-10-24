@@ -11,24 +11,12 @@ counties = ['carlow', 'cavan', 'clare', 'cork', 'donegal', 'dublin', 'galway', '
             'leitrim', 'limerick', 'longford', 'louth', 'mayo', 'meath', 'monaghan', 'offaly', 'roscommon', 'sligo',
             'tipperary', 'waterford', 'westmeath', 'wexford', 'wicklow']
 
-gaeltacht_counties = ['donegal', 'mayo', 'galway', 'kerry', 'cork', 'waterford', 'meath']
+gaeltacht_counties = ['donegal', 'mayo', 'galway',
+                      'kerry', 'cork', 'waterford', 'meath']
 
 json_file_path = ''
 json_file = None
 json_data = None
-total_number_of_townlands = 61098  # From Wikipedia
-
-
-def write_progress(count, total=total_number_of_townlands, text=''):
-    bar_len = 50  # one notch for every 2%
-    filled_length = int(round(bar_len * count / float(total)))
-
-    percent_complete = round(100.0 * count / float(total), 1)
-    bar_text = '=' * filled_length + '-' * (bar_len - filled_length)
-
-    # Clear previous line
-    sys.stdout.write('[%s] %s%s %s\r' % (bar_text, percent_complete, '%', text))
-    sys.stdout.flush()
 
 
 def load_json_file(file_path=None):
@@ -57,7 +45,8 @@ def load_json_file(file_path=None):
 def list_counties():
     print("List of counties:")
     for x, y, z in zip(counties[::3][0], counties[1::3][0], counties[2::3][0]):
-        print('{:<15}{:<15}{:<}'.format(x.capitalize(), y.capitalize(), z.capitalize()))
+        print('{:<15}{:<15}{:<}'.format(
+            x.capitalize(), y.capitalize(), z.capitalize()))
 
     print('Note that the counties in Northern Ireland are not included here.')
 
@@ -76,7 +65,8 @@ def clean_townland_dict(townland_dict, keep_gaeilge=False):
         'NAME_ENGLISH': str(townland_dict['properties']['TD_ENGLISH'])
     }
     if keep_gaeilge and str(townland_dict['properties']['COUNTY']).lower() in gaeltacht_counties:
-        new_properties['NAME_GAEILGE'] = str(townland_dict['properties']['TD_GAEILGE'])
+        new_properties['NAME_GAEILGE'] = str(
+            townland_dict['properties']['TD_GAEILGE'])
 
     townland_dict['properties'] = new_properties
 
@@ -85,10 +75,12 @@ def clean_townland_dict(townland_dict, keep_gaeilge=False):
 
     return townland_dict
 
+
 def test(townland):
     return townland
 
-def extract_townlands_by_county(county, output_directory, index=0, total=total_number_of_townlands,
+
+def extract_townlands_by_county(county, output_directory,
                                 reduce=False, gaeilge=False):
     # To save changing to upper case in each for loop iteration
     county_upper = county.upper()
@@ -98,8 +90,6 @@ def extract_townlands_by_county(county, output_directory, index=0, total=total_n
     townlands_dict_features = []
 
     for townland in json_file_iterator:
-        # write_progress(index, total=total, text=county_upper)
-        # index += 1
         if townland['properties']['COUNTY'] == county_upper:
             if reduce:
                 clean_townland_dict(townland, gaeilge)
@@ -113,7 +103,7 @@ def extract_townlands_by_county(county, output_directory, index=0, total=total_n
 
     # Write the dictionary to a file in JSON representation
     new_file_path = '{0}/townlands_{1}{2}{3}.geojson'.format(output_directory, 'reduced_' if reduce else '',
-                                                              'with_gaeilge_' if gaeilge and reduce else '', county)
+                                                             'with_gaeilge_' if gaeilge and reduce else '', county)
 
     with open(new_file_path, 'w') as o_file:
         json.dump(townlands_dict, o_file)
@@ -122,6 +112,7 @@ def extract_townlands_by_county(county, output_directory, index=0, total=total_n
 def is_input_valid(parser, values):
     # Validate arguments #
     input_valid = True
+
     # Make sure there is a path
     if not values.path:
         parser.error("Path not supplied")
@@ -141,12 +132,14 @@ def is_input_valid(parser, values):
 
     # Make sure specific county wasn't specified with all
     if values.all and values.county:
-        parser.error("--all and --county supplied. Only one should be supplied")
+        parser.error(
+            "--all and --county supplied. Only one should be supplied")
         input_valid = False
 
     # Make sure county specified is valid (if a county was specified)
     if values.county and str(values.county).lower() not in counties:
-        parser.error('County specified was invalid. Check and try again (run --counties to see list of valid counties')
+        parser.error(
+            'County specified was invalid. Check and try again (run --counties to see list of valid counties')
         input_valid = False
 
     return input_valid
@@ -155,9 +148,8 @@ def is_input_valid(parser, values):
 def extract_county_helper(county, values):
     print(values)
     print("Now extracting " + county.upper())
-    extract_townlands_by_county(county, values.output_directory, reduce=values.reduce, gaeilge=values.gaeilge,
-                                index=0,
-                                total=0)
+    extract_townlands_by_county(
+        county, values.output_directory, reduce=values.reduce, gaeilge=values.gaeilge)
 
     return county
 
@@ -183,19 +175,14 @@ def main():
     # Work out what to do
     if values.county:
         print("Extracting {0} townland information from {1}".format('reduced' if values.reduce else 'full',
-                                                                   str(values.county).capitalize()))
+                                                                    str(values.county).capitalize()))
         extract_townlands_by_county(values.county, values.output_directory, reduce=values.reduce,
                                     gaeilge=values.gaeilge)
+        print('All done.')
 
     elif values.all:
-        print("Extracting {0} townland information for all counties.".format('reduced' if values.reduce else 'full'))
-        # index = 0
-        # for county in counties:
-        #     print("Now extracting " + county.upper())
-        #     index += 1
-        #     extract_townlands_by_county(county, values.output_directory, reduce=values.reduce, gaeilge=values.gaeilge,
-        #                                 index=index * total_number_of_townlands,
-        #                                 total=len(counties) * total_number_of_townlands)
+        print("Extracting {0} townland information for all counties.".format(
+            'reduced' if values.reduce else 'full'))
 
         pool = Pool(processes=3)
         print(pool.map(partial(extract_county_helper, values=values), counties))
@@ -212,7 +199,7 @@ def print_header():
     print("Version: 0.1")
     print("Author: cw1998")
     print("Date: 24/04/18")
-    print("Updated: 27/04/2018")
+    print("Updated: 24/10/2019")
     print("Usage: See -h or --help")
     print("Python Version: 3")
     print(41 * '=')
@@ -225,13 +212,18 @@ def setup_parser():
     parser.add_argument('path', nargs='?', help='Path to file')
     parser.add_argument('-o', '--output', dest='output_directory', default=os.getcwd(),
                         help='Place to put the processed file(s). Defaults to working directory.')
-    parser.add_argument('-c', '--county', type=str, help='Specify which county to extract from the file.')
-    parser.add_argument('-r', '--reduce', action='store_true', help='Reduce geometry precision to save file size.')
-    parser.add_argument('-a', '--all', action='store_true', help='Process all counties')
+    parser.add_argument('-c', '--county', type=str,
+                        help='Specify which county to extract from the file.')
+    parser.add_argument('-r', '--reduce', action='store_true',
+                        help='Reduce geometry precision to save file size.')
+    parser.add_argument('-a', '--all', action='store_true',
+                        help='Process all counties')
     parser.add_argument('-g', '--gaeilge', '--irish', action='store_true',
                         help='Keep Gaeilge townland spellings for Gaeltacht areas when --reduce is provided.')
-    parser.add_argument('--counties', action='store_true', help='Print a list of counties supported then exit.')
-    parser.add_argument('--info', action='store_true', help='Show some information about the programme.')
+    parser.add_argument('--counties', action='store_true',
+                        help='Print a list of counties supported then exit.')
+    parser.add_argument('--info', action='store_true',
+                        help='Show some information about the programme.')
 
     return parser
 
