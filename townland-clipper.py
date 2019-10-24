@@ -5,7 +5,7 @@ import ijson
 import simplejson as json
 from functools import partial
 
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 
 counties = ['carlow', 'cavan', 'clare', 'cork', 'donegal', 'dublin', 'galway', 'kerry', 'kildare', 'kilkenny', 'laois',
             'leitrim', 'limerick', 'longford', 'louth', 'mayo', 'meath', 'monaghan', 'offaly', 'roscommon', 'sligo',
@@ -58,6 +58,8 @@ def round_list(coord_list, round_to=4):
         else:
             coord_list[i] = round(coord, round_to)
 
+    return coord_list
+
 
 def clean_townland_dict(townland_dict, keep_gaeilge=False):
     properties = townland_dict.get('properties')
@@ -76,9 +78,62 @@ def clean_townland_dict(townland_dict, keep_gaeilge=False):
 
     townland_dict['properties'] = new_properties
 
+    return townland_dict
 
-def test(townland):
-    return townland
+
+def townland_parser_helper(townland, all_data, reduce, gaeilge):
+    county = townland['properties']['COUNTY'].lower()
+    townland = clean_townland_dict(townland, gaeilge)
+
+    # Remove some coordinate precision
+    if reduce:
+        townland['geometry']['coordinates'] = round_list(
+            townland['geometry']['coordinates'])
+
+    temp = all_data[county]
+    temp['features'].append(townland)
+
+    all_data[county] = temp
+
+
+def read_and_sort_all_townlands(reduce=False, gaeilge=False):
+    all_data = Manager().dict()
+
+    # Set up all counties
+    for county in counties:
+        all_data[county] = {
+            'type': 'FeatureCollection',
+            'features': []
+        }
+
+    pool = Pool(3)
+
+    for townland in json_data:
+        pool.apply_async(townland_parser_helper, args=(
+            townland, all_data, reduce, gaeilge))
+
+    pool.close()
+    pool.join()
+
+    # Print the results
+    for i in all_data.keys():
+        print(i, all_data[i])
+
+    print(all_data)
+
+    return all_data
+
+
+def extract_all_townlands(output_directory, reduce=False, gaeilge=False):
+    all_data = read_and_sort_all_townlands(reduce, gaeilge)
+
+    for county in counties:
+        # Write the dictionary to a file in JSON representation
+        new_file_path = '{0}/townlands_{1}{2}{3}.geojson'.format(output_directory, 'reduced_' if reduce else '',
+                                                                 'with_gaeilge_' if gaeilge and reduce else '', county)
+
+        with open(new_file_path, 'w') as o_file:
+            json.dump(all_data[county], o_file)
 
 
 def extract_townlands_by_county(county, output_directory,
@@ -189,8 +244,8 @@ def main():
         print("Extracting {0} townland information for all counties.".format(
             'reduced' if values.reduce else 'full'))
 
-        pool = Pool(processes=3)
-        print(pool.map(partial(extract_county_helper, values=values), counties))
+        extract_all_townlands(values.output_directory,
+                              reduce=values.reduce, gaeilge=values.gaeilge)
 
 
 def print_header():
