@@ -60,20 +60,21 @@ def round_list(coord_list, round_to=4):
 
 
 def clean_townland_dict(townland_dict, keep_gaeilge=False):
+    properties = townland_dict.get('properties')
+
+    county = str(properties.get('COUNTY', '')).lower()
+    townland_name_english = str(properties.get('TD_ENGLISH', ''))
+    townland_name_gaeilge = str(properties.get('TD_GAEILGE', ''))
+
     # Remove unused properties
     new_properties = {
-        'NAME_ENGLISH': str(townland_dict['properties']['TD_ENGLISH'])
+        'NAME_ENGLISH': townland_name_english
     }
-    if keep_gaeilge and str(townland_dict['properties']['COUNTY']).lower() in gaeltacht_counties:
-        new_properties['NAME_GAEILGE'] = str(
-            townland_dict['properties']['TD_GAEILGE'])
+
+    if keep_gaeilge and county in gaeltacht_counties:
+        new_properties['NAME_GAEILGE'] = townland_name_gaeilge
 
     townland_dict['properties'] = new_properties
-
-    # Remove some coordinate precision
-    round_list(townland_dict['geometry']['coordinates'])
-
-    return townland_dict
 
 
 def test(townland):
@@ -91,8 +92,12 @@ def extract_townlands_by_county(county, output_directory,
 
     for townland in json_file_iterator:
         if townland['properties']['COUNTY'] == county_upper:
+            clean_townland_dict(townland, gaeilge)
+
+            # Remove some coordinate precision
             if reduce:
-                clean_townland_dict(townland, gaeilge)
+                round_list(townland['geometry']['coordinates'])
+
             townlands_dict_features.append(townland)
 
     # Put the new townland list into a new dictionary in the same format as original
