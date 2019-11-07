@@ -1,0 +1,23 @@
+{
+  "name": "townland-clipper",
+  "version": "1.0.0",
+  "description": "Processes townland geometry datasets and creates a file for each county",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cw1998/townland-clipper.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cw1998/townland-clipper/issues"
+  },
+  "homepage": "https://github.com/cw1998/townland-clipper#readme",
+  "dependencies": {
+    "yargs": "^14.2.0"
+  }
+}
